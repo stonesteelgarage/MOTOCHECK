@@ -52,7 +52,6 @@ h1, h2, h3, h4, h5, h6, p, div, span, label {
     border-radius: 8px !important;
 }
 
-/* PULSANTI GIALLI CON TESTO NERO */
 .stButton button,
 .stDownloadButton button {
     background-color: #f0c040 !important;
@@ -115,6 +114,7 @@ def pulisci_testo(testo):
         "\u20ac": "EUR",
         "\u00a0": " ",
         "\u2026": "...",
+        "\t": " ",
     }
 
     for k, v in sostituzioni.items():
@@ -124,6 +124,23 @@ def pulisci_testo(testo):
     testo = testo.encode("latin-1", "ignore").decode("latin-1")
 
     return testo
+
+
+def spezza_parole_lunghe(testo, max_len=45):
+    parole = str(testo).split(" ")
+    nuove = []
+
+    for parola in parole:
+        if len(parola) > max_len:
+            pezzi = [
+                parola[i:i + max_len]
+                for i in range(0, len(parola), max_len)
+            ]
+            nuove.append(" ".join(pezzi))
+        else:
+            nuove.append(parola)
+
+    return " ".join(nuove)
 
 
 def pulisci_pagine_pdf(pdf):
@@ -262,10 +279,11 @@ def pdf_testo(pdf, contenuto):
     pdf.set_font(
         "Helvetica",
         "",
-        10.5
+        10
     )
 
     contenuto = pulisci_testo(contenuto)
+    contenuto = spezza_parole_lunghe(contenuto, 45)
 
     righe = contenuto.splitlines()
 
@@ -276,19 +294,27 @@ def pdf_testo(pdf, contenuto):
             pdf.ln(2)
             continue
 
-        if riga.startswith("-"):
-            pdf.set_x(18)
-
+        try:
+            if riga.startswith("-"):
+                pdf.set_x(18)
+                pdf.multi_cell(
+                    175,
+                    6.5,
+                    riga
+                )
+            else:
+                pdf.set_x(15)
+                pdf.multi_cell(
+                    180,
+                    6.5,
+                    riga
+                )
+        except Exception:
+            pdf.set_x(15)
             pdf.multi_cell(
-                0,
+                180,
                 6.5,
-                riga
-            )
-        else:
-            pdf.multi_cell(
-                0,
-                6.5,
-                riga
+                spezza_parole_lunghe(riga, 25)
             )
 
     pdf.ln(2)
@@ -302,7 +328,7 @@ def pdf_tabella_prezzi(pdf):
     pdf.set_font(
         "Helvetica",
         "B",
-        10
+        9
     )
 
     pdf.set_fill_color(
@@ -311,43 +337,28 @@ def pdf_tabella_prezzi(pdf):
         220
     )
 
-    pdf.cell(35, 10, "Fascia", 1, 0, "C", True)
-    pdf.cell(40, 10, "Prezzo minimo", 1, 0, "C", True)
-    pdf.cell(40, 10, "Prezzo massimo", 1, 0, "C", True)
-    pdf.cell(75, 10, "Descrizione", 1, 1, "C", True)
+    pdf.cell(32, 9, "Fascia", 1, 0, "C", True)
+    pdf.cell(38, 9, "Prezzo min.", 1, 0, "C", True)
+    pdf.cell(38, 9, "Prezzo max.", 1, 0, "C", True)
+    pdf.cell(72, 9, "Descrizione", 1, 1, "C", True)
 
     pdf.set_font(
         "Helvetica",
         "",
-        9
+        8
     )
 
     righe = [
-        [
-            "Basso",
-            "6.000 EUR",
-            "8.000 EUR",
-            "Moto con km elevati o lavori"
-        ],
-        [
-            "Medio",
-            "8.000 EUR",
-            "11.000 EUR",
-            "Moto in buone condizioni"
-        ],
-        [
-            "Alto",
-            "11.000 EUR",
-            "15.000 EUR",
-            "Moto molto curata"
-        ]
+        ["Basso", "6.000 EUR", "8.000 EUR", "Km elevati o lavori"],
+        ["Medio", "8.000 EUR", "11.000 EUR", "Buone condizioni"],
+        ["Alto", "11.000 EUR", "15.000 EUR", "Molto curata"]
     ]
 
     for r in righe:
-        pdf.cell(35, 10, r[0], 1, 0, "C")
-        pdf.cell(40, 10, r[1], 1, 0, "C")
-        pdf.cell(40, 10, r[2], 1, 0, "C")
-        pdf.cell(75, 10, r[3], 1, 1, "L")
+        pdf.cell(32, 8, r[0], 1, 0, "C")
+        pdf.cell(38, 8, r[1], 1, 0, "C")
+        pdf.cell(38, 8, r[2], 1, 0, "C")
+        pdf.cell(72, 8, r[3], 1, 1, "L")
 
     pdf.ln(6)
 
@@ -374,6 +385,10 @@ Anno: {anno}
 NON usare markdown.
 NON usare ###.
 NON usare **.
+NON usare link lunghi.
+NON usare URL.
+NON usare tabelle markdown.
+NON usare parole lunghissime senza spazi.
 
 Usa sezioni normali ed elenchi puntati semplici.
 
@@ -399,7 +414,7 @@ La conclusione finale deve essere molto dettagliata.
         messages=[
             {
                 "role": "system",
-                "content": "Sei un esperto motociclistico professionale."
+                "content": "Sei un esperto motociclistico professionale. Scrivi senza markdown e senza URL."
             },
             {
                 "role": "user",
@@ -449,6 +464,7 @@ def crea_pdf(marca, modello, anno, report_ai):
         pdf.ln(10)
 
     titolo = f"Report motociclistico completo per {marca} {modello} anno {anno}"
+    titolo = spezza_parole_lunghe(titolo, 35)
 
     pdf.set_font(
         "Helvetica",
@@ -457,7 +473,7 @@ def crea_pdf(marca, modello, anno, report_ai):
     )
 
     pdf.multi_cell(
-        0,
+        180,
         9,
         pulisci_testo(titolo)
     )
@@ -488,7 +504,7 @@ def crea_pdf(marca, modello, anno, report_ai):
 
     pdf_testo(
         pdf,
-        "Questo report è stato generato da un'analisi dello StoneSteel Garage."
+        "Questo report e' stato generato da un'analisi dello StoneSteel Garage."
     )
 
     pulisci_pagine_pdf(pdf)
