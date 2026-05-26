@@ -65,16 +65,6 @@ h1, h2, h3, h4, h5, h6, p, div, span, label {
 .stDownloadButton button * {
     color: #000000 !important;
 }
-
-.stButton button p,
-.stDownloadButton button p {
-    color: #000000 !important;
-}
-
-.stButton button span,
-.stDownloadButton button span {
-    color: #000000 !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,30 +85,29 @@ def pulisci_testo(testo):
 
     testo = str(testo)
 
-    testo = testo.replace("###", "")
-    testo = testo.replace("##", "")
-    testo = testo.replace("#", "")
-    testo = testo.replace("**", "")
-    testo = testo.replace("---", "")
-    testo = testo.replace("[ ]", "-")
-
     sostituzioni = {
-        "\u2013": "-",
-        "\u2014": "-",
-        "\u2212": "-",
-        "\u2018": "'",
-        "\u2019": "'",
-        "\u201c": '"',
-        "\u201d": '"',
-        "\u2022": "-",
-        "\u20ac": "EUR",
+        "###": "",
+        "##": "",
+        "#": "",
+        "**": "",
+        "---": "",
+        "[ ]": "-",
+        "€": "EUR",
+        "–": "-",
+        "—": "-",
+        "−": "-",
+        "“": '"',
+        "”": '"',
+        "’": "'",
+        "‘": "'",
+        "•": "-",
         "\u00a0": " ",
         "\u2026": "...",
         "\t": " ",
     }
 
-    for k, v in sostituzioni.items():
-        testo = testo.replace(k, v)
+    for vecchio, nuovo in sostituzioni.items():
+        testo = testo.replace(vecchio, nuovo)
 
     testo = unicodedata.normalize("NFKD", testo)
     testo = testo.encode("latin-1", "ignore").decode("latin-1")
@@ -126,8 +115,9 @@ def pulisci_testo(testo):
     return testo
 
 
-def spezza_parole_lunghe(testo, max_len=45):
-    parole = str(testo).split(" ")
+def spezza_parole_lunghe(testo, max_len=38):
+    testo = str(testo)
+    parole = testo.split(" ")
     nuove = []
 
     for parola in parole:
@@ -141,11 +131,6 @@ def spezza_parole_lunghe(testo, max_len=45):
             nuove.append(parola)
 
     return " ".join(nuove)
-
-
-def pulisci_pagine_pdf(pdf):
-    for pagina in list(pdf.pages.keys()):
-        pdf.pages[pagina] = pulisci_testo(pdf.pages[pagina])
 
 
 # =========================================================
@@ -200,31 +185,23 @@ class PDF(FPDF):
 
         self.ln(52)
 
-        self.set_font(
-            "Helvetica",
-            "B",
-            16
-        )
-
+        self.set_font("Helvetica", "B", 16)
         self.cell(
-            0,
-            8,
-            "StoneSteel MotoCheck",
-            ln=True,
+            w=0,
+            h=8,
+            text="StoneSteel MotoCheck",
+            new_x="LMARGIN",
+            new_y="NEXT",
             align="C"
         )
 
-        self.set_font(
-            "Helvetica",
-            "",
-            10
-        )
-
+        self.set_font("Helvetica", "", 10)
         self.cell(
-            0,
-            6,
-            "Report con i consigli di StoneSteel",
-            ln=True,
+            w=0,
+            h=6,
+            text="Report con i consigli di StoneSteel",
+            new_x="LMARGIN",
+            new_y="NEXT",
             align="C"
         )
 
@@ -232,17 +209,11 @@ class PDF(FPDF):
 
     def footer(self):
         self.set_y(-15)
-
-        self.set_font(
-            "Helvetica",
-            "I",
-            8
-        )
-
+        self.set_font("Helvetica", "I", 8)
         self.cell(
-            0,
-            10,
-            f"Pagina {self.page_no()}",
+            w=0,
+            h=10,
+            text=f"Pagina {self.page_no()}",
             align="C"
         )
 
@@ -252,23 +223,15 @@ class PDF(FPDF):
 # =========================================================
 
 def pdf_sezione(pdf, titolo):
-    pdf.set_font(
-        "Helvetica",
-        "B",
-        14
-    )
-
-    pdf.set_fill_color(
-        230,
-        230,
-        230
-    )
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_fill_color(230, 230, 230)
 
     pdf.cell(
-        0,
-        9,
-        pulisci_testo(titolo),
-        ln=True,
+        w=0,
+        h=9,
+        text=pulisci_testo(titolo),
+        new_x="LMARGIN",
+        new_y="NEXT",
         fill=True
     )
 
@@ -276,45 +239,37 @@ def pdf_sezione(pdf, titolo):
 
 
 def pdf_testo(pdf, contenuto):
-    pdf.set_font(
-        "Helvetica",
-        "",
-        10
-    )
+    pdf.set_font("Helvetica", size=10)
 
+    contenuto = str(contenuto)
     contenuto = pulisci_testo(contenuto)
-    contenuto = spezza_parole_lunghe(contenuto, 45)
+    contenuto = spezza_parole_lunghe(contenuto, 38)
 
-    righe = contenuto.splitlines()
+    paragrafi = contenuto.split("\n")
 
-    for riga in righe:
-        riga = riga.strip()
+    for paragrafo in paragrafi:
+        paragrafo = str(paragrafo).strip()
 
-        if not riga:
-            pdf.ln(2)
+        if not paragrafo:
+            pdf.ln(3)
             continue
 
         try:
-            if riga.startswith("-"):
-                pdf.set_x(18)
-                pdf.multi_cell(
-                    175,
-                    6.5,
-                    riga
-                )
-            else:
-                pdf.set_x(15)
-                pdf.multi_cell(
-                    180,
-                    6.5,
-                    riga
-                )
-        except Exception:
             pdf.set_x(15)
             pdf.multi_cell(
-                180,
-                6.5,
-                spezza_parole_lunghe(riga, 25)
+                w=180,
+                h=6,
+                text=paragrafo,
+                border=0
+            )
+        except Exception:
+            testo_safe = spezza_parole_lunghe(paragrafo[:250], 25)
+            pdf.set_x(15)
+            pdf.multi_cell(
+                w=180,
+                h=6,
+                text=testo_safe,
+                border=0
             )
 
     pdf.ln(2)
@@ -325,28 +280,15 @@ def pdf_testo(pdf, contenuto):
 # =========================================================
 
 def pdf_tabella_prezzi(pdf):
-    pdf.set_font(
-        "Helvetica",
-        "B",
-        9
-    )
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(220, 220, 220)
 
-    pdf.set_fill_color(
-        220,
-        220,
-        220
-    )
+    pdf.cell(w=32, h=9, text="Fascia", border=1, align="C", fill=True)
+    pdf.cell(w=38, h=9, text="Prezzo min.", border=1, align="C", fill=True)
+    pdf.cell(w=38, h=9, text="Prezzo max.", border=1, align="C", fill=True)
+    pdf.cell(w=72, h=9, text="Descrizione", border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=True)
 
-    pdf.cell(32, 9, "Fascia", 1, 0, "C", True)
-    pdf.cell(38, 9, "Prezzo min.", 1, 0, "C", True)
-    pdf.cell(38, 9, "Prezzo max.", 1, 0, "C", True)
-    pdf.cell(72, 9, "Descrizione", 1, 1, "C", True)
-
-    pdf.set_font(
-        "Helvetica",
-        "",
-        8
-    )
+    pdf.set_font("Helvetica", "", 8)
 
     righe = [
         ["Basso", "6.000 EUR", "8.000 EUR", "Km elevati o lavori"],
@@ -355,10 +297,10 @@ def pdf_tabella_prezzi(pdf):
     ]
 
     for r in righe:
-        pdf.cell(32, 8, r[0], 1, 0, "C")
-        pdf.cell(38, 8, r[1], 1, 0, "C")
-        pdf.cell(38, 8, r[2], 1, 0, "C")
-        pdf.cell(72, 8, r[3], 1, 1, "L")
+        pdf.cell(w=32, h=8, text=r[0], border=1, align="C")
+        pdf.cell(w=38, h=8, text=r[1], border=1, align="C")
+        pdf.cell(w=38, h=8, text=r[2], border=1, align="C")
+        pdf.cell(w=72, h=8, text=r[3], border=1, new_x="LMARGIN", new_y="NEXT", align="L")
 
     pdf.ln(6)
 
@@ -385,7 +327,7 @@ Anno: {anno}
 NON usare markdown.
 NON usare ###.
 NON usare **.
-NON usare link lunghi.
+NON usare link.
 NON usare URL.
 NON usare tabelle markdown.
 NON usare parole lunghissime senza spazi.
@@ -414,7 +356,7 @@ La conclusione finale deve essere molto dettagliata.
         messages=[
             {
                 "role": "system",
-                "content": "Sei un esperto motociclistico professionale. Scrivi senza markdown e senza URL."
+                "content": "Sei un esperto motociclistico professionale. Scrivi senza markdown, senza URL e senza tabelle."
             },
             {
                 "role": "user",
@@ -424,9 +366,13 @@ La conclusione finale deve essere molto dettagliata.
         temperature=0.3
     )
 
-    return pulisci_testo(
-        response.choices[0].message.content
-    )
+    return pulisci_text_safe(response.choices[0].message.content)
+
+
+def pulisci_text_safe(testo):
+    testo = pulisci_testo(testo)
+    testo = spezza_parole_lunghe(testo, 38)
+    return testo
 
 
 # =========================================================
@@ -435,18 +381,10 @@ La conclusione finale deve essere molto dettagliata.
 
 def crea_pdf(marca, modello, anno, report_ai):
     pdf = PDF()
-
-    pdf.set_auto_page_break(
-        auto=True,
-        margin=16
-    )
-
+    pdf.set_auto_page_break(auto=True, margin=16)
     pdf.add_page()
 
-    foto_moto = trova_foto_moto(
-        marca,
-        modello
-    )
+    foto_moto = trova_foto_moto(marca, modello)
 
     if foto_moto and os.path.exists(foto_moto):
         try:
@@ -456,7 +394,6 @@ def crea_pdf(marca, modello, anno, report_ai):
                 y=82,
                 w=160
             )
-
             pdf.ln(95)
         except Exception:
             pdf.ln(10)
@@ -466,48 +403,28 @@ def crea_pdf(marca, modello, anno, report_ai):
     titolo = f"Report motociclistico completo per {marca} {modello} anno {anno}"
     titolo = spezza_parole_lunghe(titolo, 35)
 
-    pdf.set_font(
-        "Helvetica",
-        "B",
-        16
-    )
+    pdf.set_font("Helvetica", "B", 16)
 
     pdf.multi_cell(
-        180,
-        9,
-        pulisci_testo(titolo)
+        w=180,
+        h=9,
+        text=pulisci_testo(titolo),
+        border=0
     )
 
     pdf.ln(8)
 
-    pdf_sezione(
-        pdf,
-        "Analisi StoneSteel"
-    )
+    pdf_sezione(pdf, "Analisi StoneSteel")
+    pdf_testo(pdf, report_ai)
 
-    pdf_testo(
-        pdf,
-        report_ai
-    )
-
-    pdf_sezione(
-        pdf,
-        "Confronto prezzi medi usato"
-    )
-
+    pdf_sezione(pdf, "Confronto prezzi medi usato")
     pdf_tabella_prezzi(pdf)
 
-    pdf_sezione(
-        pdf,
-        "Note e limiti"
-    )
-
+    pdf_sezione(pdf, "Note e limiti")
     pdf_testo(
         pdf,
         "Questo report e' stato generato da un'analisi dello StoneSteel Garage."
     )
-
-    pulisci_pagine_pdf(pdf)
 
     temp_pdf = tempfile.NamedTemporaryFile(
         delete=False,
@@ -531,14 +448,10 @@ anno = st.text_input("Anno")
 
 if st.button("Genera Report"):
     if not marca or not modello or not anno:
-        st.error(
-            "Inserisci marca, modello e anno."
-        )
+        st.error("Inserisci marca, modello e anno.")
     else:
         try:
-            with st.spinner(
-                "StoneSteel sta generando il report..."
-            ):
+            with st.spinner("StoneSteel sta generando il report..."):
                 report_ai = genera_report_ai(
                     marca,
                     modello,
@@ -560,9 +473,7 @@ if st.button("Genera Report"):
                     mime="application/pdf"
                 )
 
-            st.success(
-                "Report generato correttamente."
-            )
+            st.success("Report generato correttamente.")
 
         except Exception as e:
             st.error(f"Errore durante la generazione del report: {e}")
