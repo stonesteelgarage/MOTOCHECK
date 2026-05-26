@@ -24,6 +24,18 @@ st.set_page_config(
 )
 
 # ============================================================
+def leggi_secret(nome, default=""):
+    try:
+        return st.secrets.get(nome, default)
+    except Exception:
+        return default
+
+
+try:
+    from config import OPENAI_API_KEY, LOGO_PATH
+except Exception:
+    OPENAI_API_KEY = leggi_secret("OPENAI_API_KEY", "")
+    LOGO_PATH = leggi_secret("LOGO_PATH", "stonesteel_logo.png")
 # STILE GRAFICO
 # ============================================================
 
