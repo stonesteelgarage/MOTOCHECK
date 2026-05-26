@@ -7,9 +7,23 @@ import streamlit as st
 from openai import OpenAI
 from fpdf import FPDF
 
-from config import OPENAI_API_KEY, LOGO_PATH
+# =========================================================
+# CONFIG COMPATIBILE MAC + STREAMLIT CLOUD
+# =========================================================
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+def leggi_secret(nome, default=""):
+    try:
+        return st.secrets.get(nome, default)
+    except Exception:
+        return default
+
+
+try:
+    from config import OPENAI_API_KEY, LOGO_PATH
+except Exception:
+    OPENAI_API_KEY = leggi_secret("OPENAI_API_KEY", "")
+    LOGO_PATH = leggi_secret("LOGO_PATH", "stonesteel_logo.png")
+
 
 st.set_page_config(
     page_title="StoneSteel MotoCheck",
@@ -17,12 +31,11 @@ st.set_page_config(
 )
 
 # =========================================================
-# STILE GRAFICO NERO / BIANCO
+# STILE GRAFICO
 # =========================================================
 
 st.markdown("""
 <style>
-
 .stApp {
     background-color: #000000;
     color: white;
@@ -39,24 +52,36 @@ h1, h2, h3, h4, h5, h6, p, div, span, label {
     border-radius: 8px !important;
 }
 
-.stButton button {
-    background-color: #f0c040 !important;
-    color: black !important;
-    font-weight: bold !important;
-    border-radius: 8px !important;
-    border: none !important;
-}
-
+/* PULSANTI GIALLI CON TESTO NERO */
+.stButton button,
 .stDownloadButton button {
     background-color: #f0c040 !important;
-    color: black !important;
+    color: #000000 !important;
     font-weight: bold !important;
     border-radius: 8px !important;
     border: none !important;
 }
 
+.stButton button *,
+.stDownloadButton button * {
+    color: #000000 !important;
+}
+
+.stButton button p,
+.stDownloadButton button p {
+    color: #000000 !important;
+}
+
+.stButton button span,
+.stDownloadButton button span {
+    color: #000000 !important;
+}
 </style>
 """, unsafe_allow_html=True)
+
+# =========================================================
+# HEADER
+# =========================================================
 
 st.title("StoneSteel MotoCheck")
 st.subheader("Report con i consigli di StoneSteel")
@@ -66,7 +91,6 @@ st.subheader("Report con i consigli di StoneSteel")
 # =========================================================
 
 def pulisci_testo(testo):
-
     if testo is None:
         return ""
 
@@ -103,7 +127,6 @@ def pulisci_testo(testo):
 
 
 def pulisci_pagine_pdf(pdf):
-
     for pagina in list(pdf.pages.keys()):
         pdf.pages[pagina] = pulisci_testo(pdf.pages[pagina])
 
@@ -112,12 +135,10 @@ def pulisci_pagine_pdf(pdf):
 # FOTO MOTO
 # =========================================================
 
-def trova_foto_moto(marca, modello, anno):
-
+def trova_foto_moto(marca, modello):
     query = f"{marca} {modello} motorcycle"
 
     try:
-
         image_url = f"https://source.unsplash.com/1200x800/?{query}"
 
         response = requests.get(
@@ -126,7 +147,6 @@ def trova_foto_moto(marca, modello, anno):
         )
 
         if response.status_code == 200:
-
             temp_img = tempfile.NamedTemporaryFile(
                 delete=False,
                 suffix=".jpg"
@@ -138,7 +158,6 @@ def trova_foto_moto(marca, modello, anno):
             return temp_img.name
 
     except Exception as e:
-
         print("Errore immagine:", e)
 
     return None
@@ -151,9 +170,7 @@ def trova_foto_moto(marca, modello, anno):
 class PDF(FPDF):
 
     def header(self):
-
         if os.path.exists(LOGO_PATH):
-
             try:
                 self.image(
                     LOGO_PATH,
@@ -161,7 +178,7 @@ class PDF(FPDF):
                     y=6,
                     w=35
                 )
-            except:
+            except Exception:
                 pass
 
         self.ln(52)
@@ -197,7 +214,6 @@ class PDF(FPDF):
         self.ln(12)
 
     def footer(self):
-
         self.set_y(-15)
 
         self.set_font(
@@ -219,7 +235,6 @@ class PDF(FPDF):
 # =========================================================
 
 def pdf_sezione(pdf, titolo):
-
     pdf.set_font(
         "Helvetica",
         "B",
@@ -244,7 +259,6 @@ def pdf_sezione(pdf, titolo):
 
 
 def pdf_testo(pdf, contenuto):
-
     pdf.set_font(
         "Helvetica",
         "",
@@ -256,7 +270,6 @@ def pdf_testo(pdf, contenuto):
     righe = contenuto.splitlines()
 
     for riga in righe:
-
         riga = riga.strip()
 
         if not riga:
@@ -264,7 +277,6 @@ def pdf_testo(pdf, contenuto):
             continue
 
         if riga.startswith("-"):
-
             pdf.set_x(18)
 
             pdf.multi_cell(
@@ -272,9 +284,7 @@ def pdf_testo(pdf, contenuto):
                 6.5,
                 riga
             )
-
         else:
-
             pdf.multi_cell(
                 0,
                 6.5,
@@ -289,7 +299,6 @@ def pdf_testo(pdf, contenuto):
 # =========================================================
 
 def pdf_tabella_prezzi(pdf):
-
     pdf.set_font(
         "Helvetica",
         "B",
@@ -335,7 +344,6 @@ def pdf_tabella_prezzi(pdf):
     ]
 
     for r in righe:
-
         pdf.cell(35, 10, r[0], 1, 0, "C")
         pdf.cell(40, 10, r[1], 1, 0, "C")
         pdf.cell(40, 10, r[2], 1, 0, "C")
@@ -345,10 +353,16 @@ def pdf_tabella_prezzi(pdf):
 
 
 # =========================================================
-# GENERAZIONE AI
+# AI
 # =========================================================
 
 def genera_report_ai(marca, modello, anno):
+    if not OPENAI_API_KEY:
+        raise ValueError(
+            "OPENAI_API_KEY non configurata. Inseriscila nei Secrets di Streamlit Cloud."
+        )
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
     prompt = f"""
 Genera un report motociclistico professionale in italiano.
@@ -373,7 +387,11 @@ Il report deve includere:
 6. Opinioni utenti
 7. Checklist personalizzata
 8. Analisi mercato usato
-9. Giudizio finale StoneSteel
+9. Valutazione degli esperti StoneSteel Garage
+10. Conclusione finale
+
+La valutazione degli esperti StoneSteel Garage deve essere lunga e concreta.
+La conclusione finale deve essere molto dettagliata.
 """
 
     response = client.chat.completions.create(
@@ -401,7 +419,6 @@ Il report deve includere:
 # =========================================================
 
 def crea_pdf(marca, modello, anno, report_ai):
-
     pdf = PDF()
 
     pdf.set_auto_page_break(
@@ -411,20 +428,13 @@ def crea_pdf(marca, modello, anno, report_ai):
 
     pdf.add_page()
 
-    # ======================================
-    # FOTO MOTO
-    # ======================================
-
     foto_moto = trova_foto_moto(
         marca,
-        modello,
-        anno
+        modello
     )
 
     if foto_moto and os.path.exists(foto_moto):
-
         try:
-
             pdf.image(
                 foto_moto,
                 x=25,
@@ -433,18 +443,10 @@ def crea_pdf(marca, modello, anno, report_ai):
             )
 
             pdf.ln(95)
-
-        except:
-
+        except Exception:
             pdf.ln(10)
-
     else:
-
         pdf.ln(10)
-
-    # ======================================
-    # TITOLO
-    # ======================================
 
     titolo = f"Report motociclistico completo per {marca} {modello} anno {anno}"
 
@@ -462,10 +464,6 @@ def crea_pdf(marca, modello, anno, report_ai):
 
     pdf.ln(8)
 
-    # ======================================
-    # REPORT
-    # ======================================
-
     pdf_sezione(
         pdf,
         "Analisi StoneSteel"
@@ -476,20 +474,12 @@ def crea_pdf(marca, modello, anno, report_ai):
         report_ai
     )
 
-    # ======================================
-    # PREZZI
-    # ======================================
-
     pdf_sezione(
         pdf,
         "Confronto prezzi medi usato"
     )
 
     pdf_tabella_prezzi(pdf)
-
-    # ======================================
-    # NOTE
-    # ======================================
 
     pdf_sezione(
         pdf,
@@ -498,7 +488,7 @@ def crea_pdf(marca, modello, anno, report_ai):
 
     pdf_testo(
         pdf,
-        "Questo report è stato generato da un'analisi dello Stone Steel Garage."
+        "Questo report è stato generato da un'analisi dello StoneSteel Garage."
     )
 
     pulisci_pagine_pdf(pdf)
@@ -524,41 +514,39 @@ modello = st.text_input("Modello")
 anno = st.text_input("Anno")
 
 if st.button("Genera Report"):
-
     if not marca or not modello or not anno:
-
         st.error(
             "Inserisci marca, modello e anno."
         )
-
     else:
+        try:
+            with st.spinner(
+                "StoneSteel sta generando il report..."
+            ):
+                report_ai = genera_report_ai(
+                    marca,
+                    modello,
+                    anno
+                )
 
-        with st.spinner(
-            "StoneSteel sta generando il report..."
-        ):
+                pdf_path = crea_pdf(
+                    marca,
+                    modello,
+                    anno,
+                    report_ai
+                )
 
-            report_ai = genera_report_ai(
-                marca,
-                modello,
-                anno
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label="Scarica PDF",
+                    data=f,
+                    file_name=f"StoneSteel_Report_{marca}_{modello}_{anno}.pdf",
+                    mime="application/pdf"
+                )
+
+            st.success(
+                "Report generato correttamente."
             )
 
-            pdf_path = crea_pdf(
-                marca,
-                modello,
-                anno,
-                report_ai
-            )
-
-        with open(pdf_path, "rb") as f:
-
-            st.download_button(
-                label="Scarica PDF",
-                data=f,
-                file_name=f"StoneSteel_Report_{marca}_{modello}_{anno}.pdf",
-                mime="application/pdf"
-            )
-
-        st.success(
-            "Report generato correttamente."
-        )
+        except Exception as e:
+            st.error(f"Errore durante la generazione del report: {e}")
