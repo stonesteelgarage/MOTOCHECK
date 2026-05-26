@@ -6,24 +6,9 @@ import streamlit as st
 from openai import OpenAI
 
 # ============================================================
-# CONFIG
+# CONFIG COMPATIBILE MAC + STREAMLIT CLOUD
 # ============================================================
 
-try:
-    from config import OPENAI_API_KEY, LOGO_PATH
-except Exception:
-    OPENAI_API_KEY = ""
-    LOGO_PATH = "stonesteel_logo.png"
-
-#client = OpenAI(api_key=OPENAI_API_KEY)
-
-st.set_page_config(
-    page_title="StoneSteel Moto Advisor",
-    page_icon="🏍️",
-    layout="centered"
-)
-
-# ============================================================
 def leggi_secret(nome, default=""):
     try:
         return st.secrets.get(nome, default)
@@ -36,6 +21,15 @@ try:
 except Exception:
     OPENAI_API_KEY = leggi_secret("OPENAI_API_KEY", "")
     LOGO_PATH = leggi_secret("LOGO_PATH", "stonesteel_logo.png")
+
+
+st.set_page_config(
+    page_title="StoneSteel Moto Advisor",
+    page_icon="🏍️",
+    layout="centered"
+)
+
+# ============================================================
 # STILE GRAFICO
 # ============================================================
 
@@ -80,15 +74,10 @@ p, label, div {
     color: black !important;
 }
 
-div[data-baseweb="popover"] {
-    color: black !important;
-}
-
 div[data-baseweb="popover"] * {
     color: black !important;
 }
 
-/* PULSANTI GIALLI CON TESTO NERO */
 .stButton button {
     background-color: #d4af37 !important;
     color: #000000 !important;
@@ -108,23 +97,6 @@ div[data-baseweb="popover"] * {
 }
 
 .stButton button span {
-    color: #000000 !important;
-}
-
-.stButton button:hover {
-    background-color: #f0c94a !important;
-    color: #000000 !important;
-}
-
-.stButton button:hover * {
-    color: #000000 !important;
-}
-
-.stButton button:focus {
-    color: #000000 !important;
-}
-
-.stButton button:focus * {
     color: #000000 !important;
 }
 
@@ -205,26 +177,15 @@ def pulisci_testo(testo):
 
 
 def cerca_foto_moto(nome_modello):
-    """
-    Cerca una piccola immagine del modello moto su Wikimedia Commons.
-    Se non trova nulla, restituisce None.
-    """
-
     try:
         query = f"{nome_modello} motorcycle"
 
-        url = "https://commons.wikimedia.org/w/api.php"
+        url = "https://commons.wikimedia.org/w/rest.php/v1/search/media"
 
         params = {
-            "action": "query",
-            "format": "json",
-            "generator": "search",
-            "gsrsearch": query,
-            "gsrnamespace": 6,
-            "gsrlimit": 1,
-            "prop": "imageinfo",
-            "iiprop": "url",
-            "iiurlwidth": 220
+            "q": query,
+            "type": "image",
+            "limit": 1
         }
 
         headers = {
@@ -242,14 +203,21 @@ def cerca_foto_moto(nome_modello):
             return None
 
         data = response.json()
+        pages = data.get("pages", [])
 
-        pages = data.get("query", {}).get("pages", {})
+        if not pages:
+            return None
 
-        for _, page in pages.items():
-            imageinfo = page.get("imageinfo", [])
+        primo = pages[0]
 
-            if imageinfo:
-                return imageinfo[0].get("thumburl") or imageinfo[0].get("url")
+        thumbnail = primo.get("thumbnail", {})
+        original = primo.get("originalimage", {})
+
+        if thumbnail and thumbnail.get("url"):
+            return thumbnail.get("url")
+
+        if original and original.get("source"):
+            return original.get("source")
 
         return None
 
@@ -258,10 +226,6 @@ def cerca_foto_moto(nome_modello):
 
 
 def estrai_json_da_testo(testo):
-    """
-    Prova a estrarre un JSON anche se ChatGPT aggiunge testo prima/dopo.
-    """
-
     try:
         return json.loads(testo)
     except Exception:
@@ -279,6 +243,13 @@ def estrai_json_da_testo(testo):
 
 
 def genera_5_modelli(risposte):
+    if not OPENAI_API_KEY:
+        raise ValueError(
+            "OPENAI_API_KEY non configurata. Inseriscila nei Secrets di Streamlit Cloud."
+        )
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
     prompt = f"""
 Sei StoneSteel Moto Advisor, consulente esperto di moto usate, custom, touring, naked, adventure, scrambler, café racer, moto vintage e moto moderne.
 
@@ -407,6 +378,13 @@ Regole:
 
 
 def genera_report_modello(nome_modello, profilo_utente):
+    if not OPENAI_API_KEY:
+        raise ValueError(
+            "OPENAI_API_KEY non configurata. Inseriscila nei Secrets di Streamlit Cloud."
+        )
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
     prompt = f"""
 Sei StoneSteel Moto Advisor, consulente esperto di moto usate.
 
@@ -613,16 +591,8 @@ risposte = {
 almeno_una_risposta = any(str(v).strip() for v in risposte.values())
 
 if st.button("Trova le 5 moto più adatte a me"):
-
     if not almeno_una_risposta:
         st.error("Compila almeno una risposta prima di generare il consiglio.")
-    #elif not OPENAI_API_KEY:
-        #st.error("OPENAI_API_KEY non configurata nel file config.py.")
-        
-    elif not OPENAI_API_KEY:
-    raise ValueError(
-        "OPENAI_API_KEY non configurata. Inseriscila nei Secrets di Streamlit Cloud."
-    )
     else:
         with st.spinner("StoneSteel sta analizzando il tuo profilo..."):
             try:
@@ -701,12 +671,7 @@ if st.session_state.risultato_advisor:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ========================================================
-    # MENU A TENDINA MODELLO
-    # ========================================================
-
     if nomi_modelli:
-
         st.subheader("Approfondisci un modello")
 
         modello_scelto = st.selectbox(
@@ -718,7 +683,6 @@ if st.session_state.risultato_advisor:
         st.session_state.modello_selezionato = modello_scelto
 
         if st.button("Genera report generale del modello"):
-
             with st.spinner("StoneSteel sta generando il report del modello..."):
                 try:
                     profilo = dati.get("profilo_utente", "")
