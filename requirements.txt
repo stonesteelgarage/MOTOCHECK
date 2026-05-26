@@ -1,0 +1,5 @@
+streamlit
+openai
+requests
+fpdf2
+pillow
