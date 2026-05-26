@@ -604,8 +604,13 @@ if st.button("Trova le 5 moto più adatte a me"):
 
     if not almeno_una_risposta:
         st.error("Compila almeno una risposta prima di generare il consiglio.")
+    #elif not OPENAI_API_KEY:
+        #st.error("OPENAI_API_KEY non configurata nel file config.py.")
+        
     elif not OPENAI_API_KEY:
-        st.error("OPENAI_API_KEY non configurata nel file config.py.")
+    raise ValueError(
+        "OPENAI_API_KEY non configurata. Inseriscila nei Secrets di Streamlit Cloud."
+    )
     else:
         with st.spinner("StoneSteel sta analizzando il tuo profilo..."):
             try:
