@@ -1,8 +1,33 @@
 import re
+import json
+import requests
 import streamlit as st
+from openai import OpenAI
 
 # ============================================================
 # CONFIG
+# ============================================================
+
+try:
+    from codici import (
+        SERPAPI_API_KEY,
+        OPENAI_API_KEY
+    )
+
+except Exception:
+
+    SERPAPI_API_KEY = st.secrets.get(
+        "SERPAPI_API_KEY",
+        ""
+    )
+
+    OPENAI_API_KEY = st.secrets.get(
+        "OPENAI_API_KEY",
+        ""
+    )
+
+# ============================================================
+# STREAMLIT
 # ============================================================
 
 st.set_page_config(
@@ -58,163 +83,267 @@ hr {
     border-color: #333333 !important;
 }
 
+.card {
+
+    background-color: #111111;
+
+    border: 1px solid #333333;
+
+    border-radius: 12px;
+
+    padding: 16px;
+
+    margin-bottom: 18px;
+}
+
+.card h3 {
+    color: white !important;
+}
+
+.card p {
+    color: #cccccc !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# FUNZIONI
+# UTILITY
 # ============================================================
 
-def pulisci_query(testo):
+def pulisci(testo):
 
-    testo = str(testo).strip()
-
-    testo = re.sub(
+    return re.sub(
         r"\s+",
         " ",
-        testo
+        str(testo).strip()
     )
 
-    return testo
+# ============================================================
+# CERCA ANNUNCI VERI
+# ============================================================
 
-
-def genera_link_ricerche(
+def cerca_annunci_veri(
     marca,
     modello
 ):
 
-    query = pulisci_query(
-        f"{marca} {modello}"
+    if not SERPAPI_API_KEY:
+
+        raise ValueError(
+            "SERPAPI_API_KEY mancante."
+        )
+
+    query = (
+        f"{marca} {modello} "
+        "moto usata "
+        "Subito Moto.it AutoScout24"
     )
 
-    query_plus = query.replace(
-        " ",
-        "+"
+    url = (
+        "https://serpapi.com/search.json"
     )
 
-    query_dash = (
-        query
-        .replace(" ", "-")
-        .lower()
+    params = {
+
+        "engine": "google",
+
+        "q": query,
+
+        "hl": "it",
+
+        "gl": "it",
+
+        "num": 20,
+
+        "api_key": SERPAPI_API_KEY
+    }
+
+    response = requests.get(
+        url,
+        params=params,
+        timeout=60
     )
 
-    return [
+    if response.status_code != 200:
 
-        {
-            "sito": "Subito",
+        raise ValueError(
+            f"Errore SerpAPI "
+            f"{response.status_code}: "
+            f"{response.text}"
+        )
 
-            "descrizione":
-            "Annunci moto usate su Subito",
+    data = response.json()
 
-            "link":
-            f"https://www.subito.it/annunci-italia/vendita/moto-e-scooter/?q={query_plus}"
-        },
+    risultati = []
 
-        {
-            "sito": "Moto.it",
+    domini_validi = [
 
-            "descrizione":
-            "Annunci usato su Moto.it",
+        "subito.it",
 
-            "link":
-            f"https://www.moto.it/moto-usate/ricerca?term={query_plus}"
-        },
+        "moto.it",
 
-        {
-            "sito": "AutoScout24 Moto",
+        "autoscout24.it",
 
-            "descrizione":
-            "Ricerca usato su AutoScout24",
-
-            "link":
-            f"https://www.autoscout24.it/lst-moto/{query_dash}"
-        },
-
-        {
-            "sito": "Bakeca",
-
-            "descrizione":
-            "Annunci moto su Bakeca",
-
-            "link":
-            f"https://www.bakeca.it/annunci/motori/?q={query_plus}"
-        },
-
-        {
-            "sito": "Facebook Marketplace",
-
-            "descrizione":
-            "Marketplace Facebook",
-
-            "link":
-            f"https://www.facebook.com/marketplace/search/?query={query_plus}"
-        },
-
-        {
-            "sito": "Google Ricerca",
-
-            "descrizione":
-            "Ricerca Google dedicata",
-
-            "link":
-            f"https://www.google.com/search?q={query_plus}+moto+usata"
-        },
-
-        {
-            "sito": "Google Shopping",
-
-            "descrizione":
-            "Confronto prezzi online",
-
-            "link":
-            f"https://www.google.com/search?tbm=shop&q={query_plus}"
-        },
-
-        {
-            "sito": "YouTube",
-
-            "descrizione":
-            "Video recensioni e prove",
-
-            "link":
-            f"https://www.youtube.com/results?search_query={query_plus}"
-        },
-
-        {
-            "sito": "Forum e Reddit",
-
-            "descrizione":
-            "Problemi noti e opinioni utenti",
-
-            "link":
-            f"https://www.google.com/search?q={query_plus}+forum+reddit"
-        },
-
-        {
-            "sito": "Ricerca Prezzi",
-
-            "descrizione":
-            "Analisi mercato usato",
-
-            "link":
-            f"https://www.google.com/search?q={query_plus}+prezzo+usato"
-        },
+        "facebook.com/marketplace"
     ]
+
+    for item in data.get(
+        "organic_results",
+        []
+    ):
+
+        titolo = item.get(
+            "title",
+            ""
+        )
+
+        link = item.get(
+            "link",
+            ""
+        )
+
+        snippet = item.get(
+            "snippet",
+            ""
+        )
+
+        if not link:
+            continue
+
+        if not any(
+            dominio in link
+            for dominio in domini_validi
+        ):
+            continue
+
+        risultati.append({
+
+            "titolo": titolo,
+
+            "link": link,
+
+            "descrizione": snippet
+        })
+
+        if len(risultati) >= 10:
+            break
+
+    return risultati
+
+# ============================================================
+# VALUTAZIONE STONESTEEL
+# ============================================================
+
+def valuta_annunci(
+    marca,
+    modello,
+    annunci
+):
+
+    if not OPENAI_API_KEY:
+
+        raise ValueError(
+            "OPENAI_API_KEY mancante."
+        )
+
+    client = OpenAI(
+        api_key=OPENAI_API_KEY
+    )
+
+    prompt = f"""
+Sei StoneSteel Garage,
+esperto di moto usate.
+
+Valuta questi annunci.
+
+Marca:
+{marca}
+
+Modello:
+{modello}
+
+Annunci:
+{json.dumps(annunci, ensure_ascii=False, indent=2)}
+
+Per ogni annuncio restituisci:
+- punteggio da 1 a 10
+- valutazione breve
+- cosa controllare
+- se il prezzo sembra alto, basso o corretto
+
+NON inventare dati.
+
+Rispondi SOLO in JSON valido.
+
+Formato:
+
+{{
+  "valutazioni": [
+    {{
+      "punteggio": "8",
+      "valutazione": "...",
+      "controlli": "...",
+      "prezzo": "corretto"
+    }}
+  ]
+}}
+"""
+
+    response = client.chat.completions.create(
+
+        model="gpt-4.1-mini",
+
+        messages=[
+
+            {
+                "role": "system",
+                "content":
+                "Rispondi solo in JSON valido."
+            },
+
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+
+        temperature=0.3
+    )
+
+    testo = (
+        response
+        .choices[0]
+        .message.content
+    )
+
+    try:
+
+        data = json.loads(testo)
+
+        return data.get(
+            "valutazioni",
+            []
+        )
+
+    except Exception:
+
+        return []
 
 # ============================================================
 # UI
 # ============================================================
 
-st.title("StoneSteel Annunci Moto")
+st.title(
+    "StoneSteel Annunci Moto"
+)
 
 st.subheader(
-    "Ricerca mercato usato"
+    "10 annunci veri + valutazione StoneSteel"
 )
 
 st.write(
-    "Inserisci marca e modello "
-    "per generare ricerche rapide "
-    "sui principali portali moto."
+    "Inserisci marca e modello."
 )
 
 marca = st.text_input(
@@ -226,10 +355,12 @@ modello = st.text_input(
 )
 
 # ============================================================
-# GENERAZIONE
+# AVVIO
 # ============================================================
 
-if st.button("Genera ricerche annunci"):
+if st.button(
+    "Cerca 10 annunci veri"
+):
 
     if not marca or not modello:
 
@@ -239,32 +370,105 @@ if st.button("Genera ricerche annunci"):
 
     else:
 
-        risultati = genera_link_ricerche(
-            marca,
-            modello
-        )
+        try:
 
-        st.success(
-            "Ricerche generate."
-        )
+            with st.spinner(
+                "Ricerca annunci online..."
+            ):
 
-        st.subheader(
-            "Portali disponibili"
-        )
+                annunci = (
+                    cerca_annunci_veri(
+                        marca,
+                        modello
+                    )
+                )
 
-        for risultato in risultati:
+            if not annunci:
 
-            st.markdown(
-                f"### {risultato['sito']}"
+                st.warning(
+                    "Nessun annuncio trovato."
+                )
+
+            else:
+
+                with st.spinner(
+                    "StoneSteel sta valutando..."
+                ):
+
+                    valutazioni = (
+                        valuta_annunci(
+                            marca,
+                            modello,
+                            annunci
+                        )
+                    )
+
+                st.success(
+                    "Annunci trovati."
+                )
+
+                for i, annuncio in enumerate(
+                    annunci,
+                    start=1
+                ):
+
+                    valutazione = {}
+
+                    if (
+                        i - 1
+                        < len(valutazioni)
+                    ):
+
+                        valutazione = (
+                            valutazioni[i - 1]
+                        )
+
+                    st.markdown(
+                        f"""
+                        <div class="card">
+
+                        <h3>
+                        {i}. {annuncio["titolo"]}
+                        </h3>
+
+                        <p>
+                        {annuncio["descrizione"]}
+                        </p>
+
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    st.link_button(
+                        "Apri annuncio reale",
+                        annuncio["link"]
+                    )
+
+                    st.write(
+                        f"⭐ Punteggio StoneSteel: "
+                        f"{valutazione.get('punteggio', 'N.D.')}/10"
+                    )
+
+                    st.write(
+                        f"🛠 Valutazione: "
+                        f"{valutazione.get('valutazione', 'N.D.')}"
+                    )
+
+                    st.write(
+                        f"🔍 Controlli: "
+                        f"{valutazione.get('controlli', 'N.D.')}"
+                    )
+
+                    st.write(
+                        f"💰 Prezzo: "
+                        f"{valutazione.get('prezzo', 'N.D.')}"
+                    )
+
+                    st.markdown("---")
+
+        except Exception as e:
+
+            st.error(
+                f"Errore: {e}"
             )
-
-            st.write(
-                risultato["descrizione"]
-            )
-
-            st.link_button(
-                "Apri ricerca",
-                risultato["link"]
-            )
-
-            st.markdown("---")
