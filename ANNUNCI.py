@@ -4,6 +4,7 @@ from fpdf import FPDF
 import tempfile
 import os
 import re
+import textwrap
 
 # =========================
 # CONFIG / STREAMLIT SECRETS
@@ -40,7 +41,6 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-
 .stApp {
     background-color: #050505;
     color: white;
@@ -81,8 +81,9 @@ h1, h2, h3, p, div, label {
     border: 1px solid #333333;
     margin-top: 20px;
     line-height: 1.7;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -91,7 +92,6 @@ h1, h2, h3, p, div, label {
 # =========================
 
 def pulisci_testo(testo):
-
     if not testo:
         return ""
 
@@ -111,8 +111,22 @@ def pulisci_testo(testo):
         testo = testo.replace(vecchio, nuovo)
 
     testo = re.sub(r"[^\x00-\xFF]", "", testo)
-
     return testo
+
+
+def spezza_riga_lunga(riga, lunghezza=95):
+    riga = pulisci_testo(riga)
+    riga = riga.encode("latin-1", "replace").decode("latin-1")
+
+    if "http" in riga and len(riga) > 120:
+        riga = riga[:120] + "..."
+
+    return textwrap.wrap(
+        riga,
+        width=lunghezza,
+        break_long_words=True,
+        break_on_hyphens=False
+    )
 
 # =========================
 # AI ANNUNCI
@@ -123,9 +137,9 @@ def genera_analisi_annunci(marca, modello):
     prompt = f"""
 Sei StoneSteel Garage.
 
-Sei un esperto motociclistico italiano specializzato in Harley, BMW, Ducati, Honda, Yamaha, Triumph, Moto Guzzi e moto custom/touring.
+Sei un esperto motociclistico italiano.
 
-Devi cercare online 10 annunci REALI in Italia per:
+Devi cercare online annunci REALI in Italia per:
 
 Marca: {marca}
 Modello: {modello}
@@ -137,31 +151,31 @@ Cerca soprattutto su:
 - concessionari italiani
 - altri siti affidabili italiani
 
+Obiettivo:
+trovare fino a 10 annunci reali.
+
 Per ogni annuncio restituisci:
 
-1. Numero annuncio
-2. Titolo annuncio
-3. Prezzo
-4. Località
-5. Link completo
-6. Riassunto rapido dell'annuncio
-7. Valutazione prezzo:
-   - basso
-   - corretto
-   - alto
-   - sospetto
-8. Parere StoneSteel:
-   se vale la pena considerarla oppure no
-9. Controlli consigliati
+ANNUNCIO 1
+Titolo:
+Prezzo:
+Localita:
+Link:
+Riassunto:
+Valutazione prezzo:
+Parere StoneSteel:
+Controlli consigliati:
 
 Regole:
 - Non inventare annunci.
 - Non inventare link.
-- Cerca annunci realmente esistenti.
+- Se trovi meno di 10 annunci, dichiaralo.
+- Link completi ma non eccessivamente lunghi.
 - Scrivi in italiano.
 - Non usare markdown.
-- Non usare tabelle markdown.
-- Tono professionale ma concreto.
+- Non usare tabelle.
+- Non usare simboli strani.
+- Tono concreto e professionale.
 - Alla fine fai una sintesi del mercato italiano per questo modello.
 """
 
@@ -180,14 +194,11 @@ Regole:
 class PDF(FPDF):
 
     def header(self):
-
         if os.path.exists(LOGO_PATH):
             self.image(LOGO_PATH, x=10, y=8, w=32)
 
         self.set_y(42)
-
         self.set_font("Arial", "B", 15)
-
         self.cell(
             0,
             10,
@@ -195,15 +206,11 @@ class PDF(FPDF):
             ln=True,
             align="C"
         )
-
-        self.ln(6)
+        self.ln(8)
 
     def footer(self):
-
         self.set_y(-15)
-
         self.set_font("Arial", "", 8)
-
         self.cell(
             0,
             10,
@@ -211,57 +218,50 @@ class PDF(FPDF):
             align="C"
         )
 
-# =========================
-# CREA PDF
-# =========================
 
 def crea_pdf(marca, modello, report):
 
     pdf = PDF()
-
     pdf.set_auto_page_break(auto=True, margin=18)
-
     pdf.add_page()
 
     pdf.set_font("Arial", "B", 13)
-
-    titolo = f"Ricerca annunci - {marca} {modello}"
-
-    pdf.cell(0, 10, pulisci_testo(titolo), ln=True)
-
-    pdf.ln(6)
-
-    pdf.set_font("Arial", "", 10)
+    pdf.multi_cell(
+        0,
+        8,
+        pulisci_testo(f"Ricerca annunci - {marca} {modello}")
+    )
+    pdf.ln(5)
 
     testo = pulisci_testo(report)
 
-    righe = testo.split("\n")
-
-    for riga in righe:
-
+    for riga in testo.split("\n"):
         riga = riga.strip()
 
         if not riga:
             pdf.ln(3)
             continue
 
-        if (
-            "Annuncio" in riga
-            or "Parere" in riga
-            or "Valutazione" in riga
-            or "Sintesi" in riga
-        ):
+        is_titolo = (
+            riga.upper().startswith("ANNUNCIO")
+            or riga.startswith("Sintesi")
+            or riga.startswith("Parere")
+            or riga.startswith("Valutazione")
+        )
+
+        if is_titolo:
             pdf.set_font("Arial", "B", 11)
-            pdf.multi_cell(0, 7, riga)
-            pdf.set_font("Arial", "", 10)
+            altezza = 7
         else:
-            pdf.multi_cell(0, 6, riga)
+            pdf.set_font("Arial", "", 10)
+            altezza = 6
 
-    temp_pdf = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".pdf"
-    )
+        righe_spezzate = spezza_riga_lunga(riga)
 
+        for pezzo in righe_spezzate:
+            pdf.multi_cell(180, altezza, pezzo)
+
+    temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(temp_pdf.name)
 
     return temp_pdf.name
@@ -289,26 +289,16 @@ modello = st.text_input(
     placeholder="Esempio: Road King"
 )
 
-# =========================
-# BOTTONE
-# =========================
-
 if st.button("Cerca annunci in Italia"):
 
     if not marca or not modello:
-
         st.error("Inserisci marca e modello.")
 
     else:
-
         with st.spinner("🏍️ StoneSteel sta cercando gli annunci migliori..."):
 
             try:
-
-                report = genera_analisi_annunci(
-                    marca,
-                    modello
-                )
+                report = genera_analisi_annunci(marca, modello)
 
                 st.markdown(
                     "<div class='report-box'>",
@@ -325,14 +315,9 @@ if st.button("Cerca annunci in Italia"):
                     unsafe_allow_html=True
                 )
 
-                pdf_path = crea_pdf(
-                    marca,
-                    modello,
-                    report
-                )
+                pdf_path = crea_pdf(marca, modello, report)
 
                 with open(pdf_path, "rb") as file_pdf:
-
                     st.download_button(
                         label="Scarica PDF",
                         data=file_pdf,
@@ -341,5 +326,5 @@ if st.button("Cerca annunci in Italia"):
                     )
 
             except Exception as e:
-
                 st.error(f"Errore durante la ricerca: {e}")
+        
