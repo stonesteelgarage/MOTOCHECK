@@ -79,10 +79,6 @@ p, div, span, label {
     color: black !important;
 }
 
-hr {
-    border-color: #333333 !important;
-}
-
 .card {
 
     background-color: #111111;
@@ -91,9 +87,9 @@ hr {
 
     border-radius: 12px;
 
-    padding: 16px;
+    padding: 18px;
 
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 }
 
 .card h3 {
@@ -102,6 +98,31 @@ hr {
 
 .card p {
     color: #cccccc !important;
+}
+
+.yellow-button {
+
+    display: inline-block;
+
+    background-color: #f0c040;
+
+    color: black !important;
+
+    padding: 12px 20px;
+
+    border-radius: 10px;
+
+    text-decoration: none !important;
+
+    font-weight: bold;
+
+    margin-top: 10px;
+
+    margin-bottom: 10px;
+}
+
+hr {
+    border-color: #333333 !important;
 }
 
 </style>
@@ -435,14 +456,15 @@ if st.button(
                         {annuncio["descrizione"]}
                         </p>
 
+                        <a class="yellow-button"
+                           href="{annuncio["link"]}"
+                           target="_blank">
+                           Apri annuncio reale
+                        </a>
+
                         </div>
                         """,
                         unsafe_allow_html=True
-                    )
-
-                    st.link_button(
-                        "Apri annuncio reale",
-                        annuncio["link"]
                     )
 
                     st.write(
