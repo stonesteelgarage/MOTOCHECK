@@ -1,236 +1,141 @@
+import re
+import requests
 import streamlit as st
-from openai import OpenAI
-import os
-from urllib.parse import quote
-
-# =========================
-# CONFIG / STREAMLIT SECRETS
-# =========================
-
-try:
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-except Exception:
-    from config import OPENAI_API_KEY
-
-try:
-    LOGO_PATH = st.secrets["LOGO_PATH"]
-except Exception:
-    try:
-        from config import LOGO_PATH
-    except Exception:
-        LOGO_PATH = "stonesteel_logo.png"
-
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-# =========================
-# PAGINA
-# =========================
+from bs4 import BeautifulSoup
 
 st.set_page_config(
-    page_title="StoneSteel Cerca Annunci",
-    page_icon="🏍️",
+    page_title="StoneSteel Annunci Moto",
     layout="centered"
 )
 
-# =========================
-# STILE
-# =========================
-
 st.markdown("""
 <style>
-
 .stApp {
-    background-color: #050505;
+    background-color: #000000;
     color: white;
 }
-
-html, body, [class*="css"] {
-    color: white;
-}
-
-h1, h2, h3, h4, h5, h6,
-p, div, span, label, li {
+h1, h2, h3, p, div, span, label {
     color: white !important;
 }
-
-a {
-    color: #f2c94c !important;
-    font-weight: bold;
-}
-
 .stTextInput input {
     background-color: #111111 !important;
     color: white !important;
-    border: 1px solid #444444 !important;
-    border-radius: 8px !important;
 }
-
 .stButton button {
-    background-color: #f2c94c !important;
+    background-color: #f0c040 !important;
     color: black !important;
     font-weight: bold !important;
-    border-radius: 10px !important;
-    border: none !important;
-    padding: 0.7rem 1.2rem !important;
 }
-
-.report-box {
+.stButton button * {
+    color: black !important;
+}
+.card {
     background-color: #111111;
-    padding: 22px;
-    border-radius: 14px;
-    border: 1px solid #333333;
-    margin-top: 20px;
-    line-height: 1.8;
-    color: white !important;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
 }
-
-.report-box * {
-    color: white !important;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
-# =========================
-# LINK SUBITO
-# =========================
 
-def genera_link_subito(marca, modello):
+def pulisci_query(testo):
+    testo = str(testo).strip().lower()
+    testo = re.sub(r"\s+", "-", testo)
+    return testo
 
-    query = quote(f"{marca} {modello}")
 
-    return (
+def cerca_annunci_subito(marca, modello, max_annunci=10):
+    query = f"{marca} {modello}"
+    query_url = pulisci_query(query)
+
+    url = (
         "https://www.subito.it/annunci-italia/"
-        f"vendita/moto-e-scooter/?q={query}"
+        f"vendita/moto-e-scooter/?q={query_url}"
     )
 
-# =========================
-# AI ANNUNCI
-# =========================
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        )
+    }
 
-def genera_analisi_annunci(marca, modello):
+    response = requests.get(url, headers=headers, timeout=30)
 
-    link_subito = genera_link_subito(marca, modello)
+    if response.status_code != 200:
+        raise ValueError(f"Errore Subito {response.status_code}")
 
-    prompt = f"""
-Sei StoneSteel Garage.
+    soup = BeautifulSoup(response.text, "html.parser")
 
-Sei un advisor motociclistico italiano esperto.
+    annunci = []
+    visti = set()
 
-Devi cercare online annunci REALI in Italia per:
+    for link in soup.find_all("a"):
+        href = link.get("href", "")
+        titolo = link.get_text(" ", strip=True)
 
-Marca: {marca}
-Modello: {modello}
+        if not href or not titolo:
+            continue
 
-Cerca soprattutto su:
-- moto.it
-- autoscout24.it
-- concessionari italiani
-- subito.it SOLO se il link è chiaramente valido
+        if "subito.it" not in href:
+            continue
 
-Obiettivo:
-trovare fino a 10 annunci reali.
+        if href in visti:
+            continue
 
-Per ogni annuncio restituisci:
+        if len(titolo) < 10:
+            continue
 
-ANNUNCIO 1
+        visti.add(href)
 
-Titolo:
-Prezzo:
-Localita:
-Link:
-Riassunto:
-Valutazione prezzo:
-Parere StoneSteel:
-Controlli consigliati:
+        annunci.append({
+            "titolo": titolo[:160],
+            "link": href
+        })
 
-Regole IMPORTANTI:
-- NON inventare annunci
-- NON inventare URL
-- NON usare link Subito diretti se non sei sicuro siano funzionanti
-- Se un link Subito non è verificabile, evita di inserirlo
-- Preferisci Moto.it, AutoScout24 e concessionari
-- Scrivi in italiano
-- Non usare markdown complesso
-- Non usare tabelle
-- Alla fine fai una sintesi del mercato italiano per questo modello
+        if len(annunci) >= max_annunci:
+            break
 
-Alla fine aggiungi:
+    return annunci, url
 
-RICERCA SUBITO.IT
 
-{link_subito}
-"""
+st.title("StoneSteel Annunci Moto")
+st.subheader("Trova annunci compatibili")
 
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        tools=[{"type": "web_search"}],
-        input=prompt
-    )
+marca = st.text_input("Marca")
+modello = st.text_input("Modello")
 
-    return response.output_text
-
-# =========================
-# INTERFACCIA
-# =========================
-
-if os.path.exists(LOGO_PATH):
-    st.image(LOGO_PATH, width=170)
-
-st.title("StoneSteel Cerca Annunci")
-
-st.write(
-    "Trova annunci moto in Italia e ricevi una prima valutazione StoneSteel."
-)
-
-marca = st.text_input(
-    "Marca moto",
-    placeholder="Esempio: Harley-Davidson"
-)
-
-modello = st.text_input(
-    "Modello moto",
-    placeholder="Esempio: Road King"
-)
-
-# =========================
-# BOTTONE
-# =========================
-
-if st.button("Cerca annunci in Italia"):
+if st.button("Cerca 10 annunci"):
 
     if not marca or not modello:
-
         st.error("Inserisci marca e modello.")
-
     else:
+        try:
+            with st.spinner("StoneSteel sta cercando annunci..."):
+                annunci, url_ricerca = cerca_annunci_subito(marca, modello)
 
-        with st.spinner("🏍️ StoneSteel sta cercando gli annunci migliori..."):
+            st.success("Ricerca completata.")
 
-            try:
+            st.markdown(f"[Apri ricerca completa su Subito]({url_ricerca})")
 
-                report = genera_analisi_annunci(
-                    marca,
-                    modello
-                )
+            if not annunci:
+                st.warning("Non ho trovato annunci leggibili automaticamente. Usa il link alla ricerca completa.")
+            else:
+                st.subheader("Annunci trovati")
 
-                st.markdown(
-                    "<div class='report-box'>",
-                    unsafe_allow_html=True
-                )
+                for i, annuncio in enumerate(annunci, start=1):
+                    st.markdown(
+                        f"""
+                        <div class="card">
+                            <h3>{i}. {annuncio["titolo"]}</h3>
+                            <a href="{annuncio["link"]}" target="_blank">Apri annuncio</a>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
-                st.markdown(
-                    report,
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(
-                    "</div>",
-                    unsafe_allow_html=True
-                )
-
-            except Exception as e:
-
-                st.error(f"Errore durante la ricerca: {e}")
+        except Exception as e:
+            st.error(f"Errore durante la ricerca: {e}")
