@@ -3,3 +3,4 @@ openai
 requests
 fpdf2
 pillow
+beautifulsoup4
