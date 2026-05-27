@@ -1,7 +1,9 @@
+```python
 import streamlit as st
 from openai import OpenAI
 import os
 import re
+from urllib.parse import quote
 
 # =========================
 # CONFIG / STREAMLIT SECRETS
@@ -38,13 +40,15 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+
 .stApp {
     background-color: #050505;
     color: white;
 }
 
-h1, h2, h3, p, div, label {
-    color: white;
+h1, h2, h3, h4, h5, h6,
+p, div, span, label, li {
+    color: white !important;
 }
 
 a {
@@ -54,14 +58,14 @@ a {
 
 .stTextInput input {
     background-color: #111111;
-    color: white;
+    color: white !important;
     border: 1px solid #444444;
     border-radius: 8px;
 }
 
 .stButton button {
     background-color: #f2c94c;
-    color: black;
+    color: black !important;
     font-weight: bold;
     border-radius: 10px;
     border: none;
@@ -74,10 +78,16 @@ a {
     border-radius: 14px;
     border: 1px solid #333333;
     margin-top: 20px;
-    line-height: 1.7;
+    line-height: 1.8;
+    color: white !important;
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
+
+.report-box * {
+    color: white !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -86,6 +96,7 @@ a {
 # =========================
 
 def pulisci_testo(testo):
+
     if not testo:
         return ""
 
@@ -107,13 +118,30 @@ def pulisci_testo(testo):
     return testo
 
 # =========================
+# LINK SUBITO RICERCA
+# =========================
+
+def genera_link_subito(marca, modello):
+
+    query = quote(f"{marca} {modello}")
+
+    return (
+        "https://www.subito.it/annunci-italia/"
+        f"vendita/moto-e-scooter/?q={query}"
+    )
+
+# =========================
 # AI ANNUNCI
 # =========================
 
 def genera_analisi_annunci(marca, modello):
 
+    link_subito = genera_link_subito(marca, modello)
+
     prompt = f"""
-Sei StoneSteel Garage, advisor motociclistico italiano.
+Sei StoneSteel Garage.
+
+Sei un advisor motociclistico italiano esperto.
 
 Devi cercare online annunci REALI in Italia per:
 
@@ -121,37 +149,45 @@ Marca: {marca}
 Modello: {modello}
 
 Cerca soprattutto su:
-- subito.it
 - moto.it
 - autoscout24.it
 - concessionari italiani
-- altri siti affidabili italiani
+- subito.it SOLO se il link è chiaramente valido
 
 Obiettivo:
 trovare fino a 10 annunci reali.
 
-Per ogni annuncio restituisci in questo formato:
+Formato risposta:
 
 ### ANNUNCIO 1
-**Titolo:** ...
-**Prezzo:** ...
-**Località:** ...
-**Link:** https://...
-**Riassunto:** ...
-**Valutazione prezzo:** basso / corretto / alto / sospetto
-**Parere StoneSteel:** ...
-**Controlli consigliati:** ...
 
-Regole:
-- Non inventare annunci.
-- Non inventare link.
-- Se trovi meno di 10 annunci, dichiaralo chiaramente.
-- Il link deve essere completo e cliccabile.
+Titolo:
+Prezzo:
+Localita:
+Link:
+Riassunto:
+Valutazione prezzo:
+Parere StoneSteel:
+Controlli consigliati:
+
+Regole IMPORTANTI:
+- NON inventare annunci.
+- NON inventare URL.
+- NON usare link Subito diretti se non sei sicuro siano funzionanti.
+- Se un link Subito non è verificabile, evita di inserirlo.
+- Preferisci Moto.it, AutoScout24 e concessionari.
 - Scrivi in italiano.
 - Usa markdown semplice.
 - Non usare tabelle.
-- Tono concreto e professionale.
+- Non usare simboli strani.
 - Alla fine fai una sintesi del mercato italiano per questo modello.
+
+Alla fine aggiungi anche:
+
+### RICERCA SUBITO.IT
+
+Link ricerca generale:
+{link_subito}
 """
 
     response = client.responses.create(
@@ -185,16 +221,27 @@ modello = st.text_input(
     placeholder="Esempio: Road King"
 )
 
+# =========================
+# BOTTONE
+# =========================
+
 if st.button("Cerca annunci in Italia"):
 
     if not marca or not modello:
+
         st.error("Inserisci marca e modello.")
 
     else:
+
         with st.spinner("🏍️ StoneSteel sta cercando gli annunci migliori..."):
 
             try:
-                report = genera_analisi_annunci(marca, modello)
+
+                report = genera_analisi_annunci(
+                    marca,
+                    modello
+                )
+
                 report = pulisci_testo(report)
 
                 st.markdown(
@@ -202,7 +249,10 @@ if st.button("Cerca annunci in Italia"):
                     unsafe_allow_html=True
                 )
 
-                st.markdown(report, unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='color:white'>{report}</div>",
+                    unsafe_allow_html=True
+                )
 
                 st.markdown(
                     "</div>",
@@ -210,4 +260,6 @@ if st.button("Cerca annunci in Italia"):
                 )
 
             except Exception as e:
+
                 st.error(f"Errore durante la ricerca: {e}")
+```
