@@ -1,8 +1,6 @@
-```python
 import streamlit as st
 from openai import OpenAI
 import os
-import re
 from urllib.parse import quote
 
 # =========================
@@ -46,6 +44,10 @@ st.markdown("""
     color: white;
 }
 
+html, body, [class*="css"] {
+    color: white;
+}
+
 h1, h2, h3, h4, h5, h6,
 p, div, span, label, li {
     color: white !important;
@@ -57,19 +59,19 @@ a {
 }
 
 .stTextInput input {
-    background-color: #111111;
+    background-color: #111111 !important;
     color: white !important;
-    border: 1px solid #444444;
-    border-radius: 8px;
+    border: 1px solid #444444 !important;
+    border-radius: 8px !important;
 }
 
 .stButton button {
-    background-color: #f2c94c;
+    background-color: #f2c94c !important;
     color: black !important;
-    font-weight: bold;
-    border-radius: 10px;
-    border: none;
-    padding: 0.7rem 1.2rem;
+    font-weight: bold !important;
+    border-radius: 10px !important;
+    border: none !important;
+    padding: 0.7rem 1.2rem !important;
 }
 
 .report-box {
@@ -92,33 +94,7 @@ a {
 """, unsafe_allow_html=True)
 
 # =========================
-# PULIZIA TESTO
-# =========================
-
-def pulisci_testo(testo):
-
-    if not testo:
-        return ""
-
-    sostituzioni = {
-        "€": "EUR",
-        "–": "-",
-        "—": "-",
-        "“": '"',
-        "”": '"',
-        "’": "'",
-        "‘": "'",
-        "•": "-",
-        "…": "...",
-    }
-
-    for vecchio, nuovo in sostituzioni.items():
-        testo = testo.replace(vecchio, nuovo)
-
-    return testo
-
-# =========================
-# LINK SUBITO RICERCA
+# LINK SUBITO
 # =========================
 
 def genera_link_subito(marca, modello):
@@ -157,9 +133,9 @@ Cerca soprattutto su:
 Obiettivo:
 trovare fino a 10 annunci reali.
 
-Formato risposta:
+Per ogni annuncio restituisci:
 
-### ANNUNCIO 1
+ANNUNCIO 1
 
 Titolo:
 Prezzo:
@@ -171,22 +147,20 @@ Parere StoneSteel:
 Controlli consigliati:
 
 Regole IMPORTANTI:
-- NON inventare annunci.
-- NON inventare URL.
-- NON usare link Subito diretti se non sei sicuro siano funzionanti.
-- Se un link Subito non è verificabile, evita di inserirlo.
-- Preferisci Moto.it, AutoScout24 e concessionari.
-- Scrivi in italiano.
-- Usa markdown semplice.
-- Non usare tabelle.
-- Non usare simboli strani.
-- Alla fine fai una sintesi del mercato italiano per questo modello.
+- NON inventare annunci
+- NON inventare URL
+- NON usare link Subito diretti se non sei sicuro siano funzionanti
+- Se un link Subito non è verificabile, evita di inserirlo
+- Preferisci Moto.it, AutoScout24 e concessionari
+- Scrivi in italiano
+- Non usare markdown complesso
+- Non usare tabelle
+- Alla fine fai una sintesi del mercato italiano per questo modello
 
-Alla fine aggiungi anche:
+Alla fine aggiungi:
 
-### RICERCA SUBITO.IT
+RICERCA SUBITO.IT
 
-Link ricerca generale:
 {link_subito}
 """
 
@@ -242,15 +216,13 @@ if st.button("Cerca annunci in Italia"):
                     modello
                 )
 
-                report = pulisci_testo(report)
-
                 st.markdown(
                     "<div class='report-box'>",
                     unsafe_allow_html=True
                 )
 
                 st.markdown(
-                    f"<div style='color:white'>{report}</div>",
+                    report,
                     unsafe_allow_html=True
                 )
 
@@ -262,4 +234,3 @@ if st.button("Cerca annunci in Italia"):
             except Exception as e:
 
                 st.error(f"Errore durante la ricerca: {e}")
-```
