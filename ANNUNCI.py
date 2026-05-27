@@ -1,7 +1,5 @@
 import re
-import requests
 import streamlit as st
-from bs4 import BeautifulSoup
 
 # ============================================================
 # STREAMLIT CONFIG
@@ -92,11 +90,11 @@ h1, h2, h3, h4, h5, h6, p, div, span, label {
 
 def pulisci_query(testo):
 
-    testo = str(testo).strip().lower()
+    testo = str(testo).strip()
 
     testo = re.sub(
         r"\s+",
-        "-",
+        " ",
         testo
     )
 
@@ -104,93 +102,133 @@ def pulisci_query(testo):
 
 
 # ============================================================
-# CERCA ANNUNCI
+# GENERA LINK RICERCHE
 # ============================================================
 
-def cerca_annunci_subito(
+def genera_link_ricerche(
     marca,
-    modello,
-    max_annunci=10
+    modello
 ):
 
     query = f"{marca} {modello}"
 
-    query_url = pulisci_query(query)
+    query = pulisci_query(query)
 
-    url = (
-        "https://www.subito.it/annunci-italia/"
-        f"vendita/moto-e-scooter/?q={query_url}"
+    query_plus = query.replace(
+        " ",
+        "+"
     )
 
-    headers = {
-
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0 Safari/537.36"
-        )
-    }
-
-    response = requests.get(
-        url,
-        headers=headers,
-        timeout=30
+    query_dash = (
+        query
+        .replace(" ", "-")
+        .lower()
     )
 
-    if response.status_code != 200:
+    risultati = [
 
-        raise ValueError(
-            f"Errore Subito {response.status_code}"
-        )
+        {
+            "sito": "Subito",
 
-    soup = BeautifulSoup(
-        response.text,
-        "html.parser"
-    )
+            "descrizione":
+            "Ricerca annunci usato su Subito",
 
-    annunci = []
+            "link":
+            f"https://www.subito.it/annunci-italia/vendita/moto-e-scooter/?q={query_plus}"
+        },
 
-    links = soup.find_all("a")
+        {
+            "sito": "Moto.it",
 
-    visti = set()
+            "descrizione":
+            "Ricerca annunci usato su Moto.it",
 
-    for link in links:
+            "link":
+            f"https://www.moto.it/moto-usate/ricerca?term={query_plus}"
+        },
 
-        href = link.get("href", "")
+        {
+            "sito": "AutoScout24 Moto",
 
-        titolo = link.get_text(
-            " ",
-            strip=True
-        )
+            "descrizione":
+            "Ricerca annunci usato su AutoScout24",
 
-        if not href:
-            continue
+            "link":
+            f"https://www.autoscout24.it/lst-moto/{query_dash}"
+        },
 
-        if not titolo:
-            continue
+        {
+            "sito": "Bakeca",
 
-        if "subito.it" not in href:
-            continue
+            "descrizione":
+            "Ricerca annunci moto su Bakeca",
 
-        if href in visti:
-            continue
+            "link":
+            f"https://www.bakeca.it/annunci/motori/?q={query_plus}"
+        },
 
-        if len(titolo) < 10:
-            continue
+        {
+            "sito": "Facebook Marketplace",
 
-        visti.add(href)
+            "descrizione":
+            "Ricerca Marketplace Facebook",
 
-        annunci.append({
+            "link":
+            f"https://www.facebook.com/marketplace/search/?query={query_plus}"
+        },
 
-            "titolo": titolo[:180],
+        {
+            "sito": "Google Ricerca",
 
-            "link": href
-        })
+            "descrizione":
+            "Ricerca Google dedicata alla moto",
 
-        if len(annunci) >= max_annunci:
-            break
+            "link":
+            f"https://www.google.com/search?q={query_plus}+moto+usata"
+        },
 
-    return annunci, url
+        {
+            "sito": "Google Shopping",
+
+            "descrizione":
+            "Ricerca Google Shopping",
+
+            "link":
+            f"https://www.google.com/search?tbm=shop&q={query_plus}"
+        },
+
+        {
+            "sito": "YouTube",
+
+            "descrizione":
+            "Video recensioni e prove",
+
+            "link":
+            f"https://www.youtube.com/results?search_query={query_plus}"
+        },
+
+        {
+            "sito": "Forum / Reddit",
+
+            "descrizione":
+            "Discussioni utenti e problemi noti",
+
+            "link":
+            f"https://www.google.com/search?q={query_plus}+reddit+forum"
+        },
+
+        {
+            "sito": "Ricerca prezzi",
+
+            "descrizione":
+            "Confronto prezzi usato",
+
+            "link":
+            f"https://www.google.com/search?q={query_plus}+prezzo+usato"
+        },
+    ]
+
+    return risultati
 
 
 # ============================================================
@@ -200,12 +238,13 @@ def cerca_annunci_subito(
 st.title("StoneSteel Annunci Moto")
 
 st.subheader(
-    "Trova annunci moto compatibili"
+    "Ricerca annunci e mercato usato"
 )
 
 st.write(
-    "Inserisci marca e modello per cercare "
-    "10 annunci compatibili online."
+    "Inserisci marca e modello per ottenere "
+    "link rapidi ai principali portali "
+    "di annunci moto."
 )
 
 marca = st.text_input(
@@ -217,10 +256,10 @@ modello = st.text_input(
 )
 
 # ============================================================
-# RICERCA
+# GENERA RICERCHE
 # ============================================================
 
-if st.button("Cerca 10 annunci"):
+if st.button("Genera ricerche annunci"):
 
     if not marca or not modello:
 
@@ -232,84 +271,55 @@ if st.button("Cerca 10 annunci"):
 
         try:
 
-            with st.spinner(
-                "StoneSteel sta cercando annunci..."
-            ):
-
-                annunci, url_ricerca = (
-                    cerca_annunci_subito(
-                        marca,
-                        modello
-                    )
-                )
+            risultati = genera_link_ricerche(
+                marca,
+                modello
+            )
 
             st.success(
-                "Ricerca completata."
+                "Ricerche generate."
             )
 
-            st.markdown(
-                f"""
-                <a href="{url_ricerca}" target="_blank">
-                    <button style="
-                        background-color:#f0c040;
-                        color:black;
-                        font-weight:bold;
-                        border:none;
-                        padding:12px 20px;
-                        border-radius:10px;
-                        cursor:pointer;
-                        width:100%;
-                        margin-bottom:20px;
-                    ">
-                        Apri ricerca completa su Subito
-                    </button>
-                </a>
-                """,
-                unsafe_allow_html=True
+            st.subheader(
+                "Portali e ricerche disponibili"
             )
 
-            if not annunci:
+            for i, risultato in enumerate(
+                risultati,
+                start=1
+            ):
 
-                st.warning(
-                    "Non ho trovato annunci leggibili automaticamente."
-                )
+                sito = risultato["sito"]
 
-            else:
+                descrizione = risultato["descrizione"]
 
-                st.subheader(
-                    "Annunci trovati"
-                )
+                link = risultato["link"]
 
-                for i, annuncio in enumerate(
-                    annunci,
-                    start=1
-                ):
+                st.markdown(
+                    f"""
+                    <div class="card">
 
-                    titolo = annuncio["titolo"]
-
-                    link = annuncio["link"]
-
-                    st.markdown(
-                        f"""
-                        <div class="card">
-
-                            <div class="card-title">
-                                {i}. {titolo}
-                            </div>
-
-                            <div class="card-link">
-                                <a href="{link}" target="_blank">
-                                    Apri annuncio
-                                </a>
-                            </div>
-
+                        <div class="card-title">
+                            {i}. {sito}
                         </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+
+                        <p>
+                            {descrizione}
+                        </p>
+
+                        <div class="card-link">
+                            <a href="{link}" target="_blank">
+                                Apri ricerca
+                            </a>
+                        </div>
+
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
         except Exception as e:
 
             st.error(
-                f"Errore durante la ricerca: {e}"
+                f"Errore durante la generazione: {e}"
             )
