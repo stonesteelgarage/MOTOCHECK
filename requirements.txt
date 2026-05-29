@@ -4,3 +4,4 @@ requests
 fpdf2
 pillow
 beautifulsoup4
+PyPDF2
