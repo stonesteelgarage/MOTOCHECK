@@ -677,7 +677,7 @@ if st.button(
             else:
 
                 with st.spinner(
-                    "StoneSteel sta facendo scraping e analisi OpenAI degli annunci..."
+                    "StoneSteel sta facendo scraping e analisi AI degli annunci..."
                 ):
 
                     valutazioni = (
