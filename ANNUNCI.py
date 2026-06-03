@@ -624,7 +624,7 @@ st.title(
 )
 
 st.subheader(
-    "10 annunci veri + scraping OpenAI + valutazione StoneSteel"
+    "10 annunci veri + scraping AI + valutazione StoneSteel"
 )
 
 st.write(
@@ -677,7 +677,7 @@ if st.button(
             else:
 
                 with st.spinner(
-                    "StoneSteel sta facendo scraping e analisi OpenAI degli annunci..."
+                    "StoneSteel sta facendo scraping e analisi AI degli annunci..."
                 ):
 
                     valutazioni = (
