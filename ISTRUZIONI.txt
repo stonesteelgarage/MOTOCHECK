@@ -1,0 +1,19 @@
+Sostituisci nella cartella STONESTEEL_BACKEND i file:
+
+- main.py
+- auth.py
+
+Poi nel terminale, con .venv attivo, installa:
+
+pip3 install python-multipart==0.0.20 bcrypt==4.0.1 email-validator==2.2.0
+
+Riavvia:
+
+python3 -m uvicorn main:app --reload
+
+Poi su http://127.0.0.1:8000/docs premi Authorize e inserisci:
+
+username: test@stonesteel.it
+password: 123456
+
+Lascia vuoti client_id e client_secret.
